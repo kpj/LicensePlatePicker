@@ -1,4 +1,5 @@
 import json
+import collections
 
 import pandas as pd
 
@@ -42,13 +43,42 @@ def main():
     }, inplace=True)
 
     # generate result
-    data = {}
+    letter_succession = collections.defaultdict(set)
+
+    license_data = {}
     for row in df.itertuples():
-        data[row.license] = {
+        # gather information about current license
+        license_data[row.license] = {
             'city': row.city,
             'county': row.county,
             'source': row.source
         }
+
+        # all licenses below maximal length can be followed by space
+        if len(row.license) < 3:
+            letter_succession[row.license].update(' ')
+
+        # all license above minimal length define possible follow-up letters
+        if len(row.license) > 1:
+            *tmp, tail = row.license
+            head = ''.join(tmp)
+            letter_succession[head].update(tail)
+
+            # if head is longer than 1 (i.e. total license length must be 3),
+            # i.e. head has length 2, its first letter can be followed
+            # by its second
+            if len(head) > 1:
+                assert len(row.license) == 3
+                assert len(head) == 2
+                letter_succession[head[0]].update(head[1])
+
+    letter_succession = {k: sorted(v) for k, v in letter_succession.items()}
+
+    # save to json
+    data = {
+        'licenseData': license_data,
+        'letterSuccession': letter_succession
+    }
 
     fname = './license-plate-data.json'
     with open(fname, 'w') as f:
